@@ -8,9 +8,9 @@ import org.json.simple.JSONObject;
  */
 public class AttributesBean {
 
-	JSONObject runningJSONObject = new JSONObject();
+	private JSONObject runningJSONObject = new JSONObject();
 
-	JSONObject permanentJSONObject = new JSONObject();
+	private JSONObject permanentJSONObject = new JSONObject();
 
 	// Setters and getters ///////////////////
 	public JSONObject getRunningJSONObject() {

@@ -1,5 +1,6 @@
 package imdbEngine;
 
+import java.util.Map.Entry;
 import java.util.Scanner;
 
 import org.json.simple.JSONObject;
@@ -69,37 +70,17 @@ public class IMDBEngine {
 							currentJSONObject);
 					firstRound = false;
 				} else {
-					/*JSONObject innerJsonObject = (JSONObject) attributes
-							.getRunningJSONObject().get(
-									"Level" + (currentLevelNo - 1));
-					innerJsonObject.put(getLevelString(), currentJSONObject);
-					attributes.getRunningJSONObject().put(
-							"Level" + (currentLevelNo - 1), innerJsonObject);
-*/
-					/*
-					 * Copy all the variable on the upper/parent level to this
-					 */
-
 				}
 			}
 			// SET command
 			else if (parsedStr[0].equalsIgnoreCase("SET")) {
 				System.out.println("setting");
-				// parsedStr = lineCommand.toString().split(" ");
 
-				// currentJSONObject = new JSONObject();
 				if (firstRound) {
 					currentLevelNo++;
-					// currentJSONObject.put(parsedStr[1], parsedStr[2]);
-					// attributes.getRunningJSONObject().put(getLevelString(),
-					// currentJSONObject);
 					firstRound = false;
 				} else {
-					// currentJSONObject.put(parsedStr[1], parsedStr[2]);
-					// attributes.getRunningJSONObject().put(getLevelString(),
-					// currentJSONObject);
 				}
-				// currentJSONObject.put(parsedStr[1], parsedStr[2]);
 				currentJSONObject = (JSONObject) attributes
 						.getRunningJSONObject().get(getLevelString());
 				if (null == currentJSONObject) {
@@ -108,19 +89,75 @@ public class IMDBEngine {
 				currentJSONObject.put(parsedStr[1], parsedStr[2]);
 				attributes.getRunningJSONObject().put(getLevelString(),
 						currentJSONObject);
-
 			}
 			// GET command
 			else if (parsedStr[0].equalsIgnoreCase("GET")) {
 				String variableToGet = parsedStr[1];
-				Object resultObject = attributes.getRunningJSONObject().get(
-						getLevelString());
+				JSONObject resultObject = null;
+				String resultString = null;
+
+				for (int i = currentLevelNo; i > 0; i--) {
+					resultObject = (JSONObject) attributes
+							.getRunningJSONObject().get("Level" + i);
+					if (resultObject.containsKey(variableToGet)) {
+						resultString = (String) resultObject.get(variableToGet);
+						break;
+					}
+				}
+				System.out.println("result of GET:" + resultString);
 			}
-			//
-			if (lineCommand.toString().equalsIgnoreCase("COMMIT")
-					|| lineCommand.toString().equalsIgnoreCase("ROLLBACK")) {
+			// NUMEQUALTO command
+			else if (parsedStr[0].equalsIgnoreCase("NUMEQUALTO")) {
+				String valueToCompare = parsedStr[1];
+				int numEqualTo = 0;
+				for (int i = currentLevelNo; i > 0; i--) {
+					JSONObject resultObject = (JSONObject) attributes
+							.getRunningJSONObject().get("Level" + i);
+					if (resultObject.containsValue(valueToCompare)) {
+						numEqualTo++;
+					}
+				}
+				System.out.println("Result of NUMEQUALTO: " + valueToCompare
+						+ " is: " + numEqualTo);
+			}
+			// UNSET command
+			else if (parsedStr[0].equalsIgnoreCase("UNSET")) {
+				String variableToUnset = parsedStr[1];
+
+				JSONObject resultObject = (JSONObject) attributes
+						.getRunningJSONObject().get(getLevelString());
+				resultObject.remove(variableToUnset);
+				System.out.println("Removed variable " + variableToUnset
+						+ " from current level.");
+			}
+			// ROLLBACK command: delete current block and its operations
+			else if (parsedStr[0].equalsIgnoreCase("ROLLBACK")) {
 				currentActiveTransactions--;
 
+				attributes.getRunningJSONObject().remove(getLevelString());
+
+				currentLevelNo--;
+			}
+			// COMMIT command: commit all operations starting at the top level
+			else if (parsedStr[0].equalsIgnoreCase("COMMIT")) {
+				// for (Object key : attributes.getRunningJSONObject().keySet())
+				// {
+				JSONObject resultJSONObject = new JSONObject();
+				for (int i = 1; i <= currentLevelNo; i++) {
+					System.out.println("elements:"
+							+ ((JSONObject) attributes.getRunningJSONObject()
+									.get("Level" + i)).entrySet());
+					resultJSONObject.putAll(((JSONObject) attributes
+							.getRunningJSONObject().get("Level" + i)));
+				}
+				attributes.getPermanentJSONObject().put("Level1",
+						resultJSONObject);
+				System.out.println("running json:"
+						+ attributes.getPermanentJSONObject().toString());
+
+				// finally reset running json with freshly committed info
+				attributes.getRunningJSONObject().putAll(
+						attributes.getPermanentJSONObject());
 			}
 
 		}
@@ -131,6 +168,7 @@ public class IMDBEngine {
 	}
 
 	public String getLevelString() {
+		System.out.println("Current level no is:" + currentLevelNo);
 		return "Level" + currentLevelNo;
 	}
 
