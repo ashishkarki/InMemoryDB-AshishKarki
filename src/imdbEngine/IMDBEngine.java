@@ -7,9 +7,14 @@ import org.json.simple.JSONObject;
 /**
  * @author ASHISH KARKI_
  * 
+ * @Description The engine gets input from user and completes the data and
+ *              transaction operations.
  */
 public class IMDBEngine {
 
+	/**
+	 * Major attributes required in the engine.
+	 */
 	private AttributesBean attributes;
 
 	/**
@@ -18,77 +23,80 @@ public class IMDBEngine {
 	Scanner scanner;
 
 	/**
-	 * A single line of command input from the user
-	 */
-	private StringBuilder lineCommand;
-
-	/**
 	 * current level number
 	 */
-	int currentLevelNo = 0;
+	// private int currentLevelNo = 0;
 
+	/**
+	 * Constructor
+	 */
 	public IMDBEngine() {
 		this.attributes = new AttributesBean();
 
 		this.scanner = new Scanner(System.in);
 	}
 
+	/**
+	 * @Description Read input from user (one line at a time) and process them
+	 */
+	@SuppressWarnings("unchecked")
 	public void readUserInputAndProcess() {
-		// a new transaction is started
-
-		@SuppressWarnings("unused")
+		// All transactions started with the BEGIN command
 		int currentActiveTransactions = 0;
 
 		// Level from which the latest UNSET command removed a variable
 		int variableUnsetLevel = 0;
 
-		// parent level of current level
+		// Is it the first time any operation/transaction is being performed
 		boolean firstRound = true;
 
 		// Parsed/Split string from user input
 		String[] parsedStr = { "n", "n", "n" };
 
+		// The object where we perform our operations
 		JSONObject currentJSONObject = new JSONObject();
 
 		System.out
 				.println("Please enter commands, one line at a time. Enter END to quit.");
-		lineCommand = new StringBuilder();
 
 		while (!parsedStr[0].equalsIgnoreCase("END")) {
-			System.out.println("Its not the end");
 			parsedStr = scanner.nextLine().toString().split(" ");
 
-			// BEGIN new transaction
+			// BEGIN command
 			if (parsedStr[0].equalsIgnoreCase("BEGIN")) {
 				currentActiveTransactions++;
-				currentLevelNo++;
+				attributes.incrementCurrentLevelNo();
 				currentJSONObject = new JSONObject();
 
 				/*
-				 * A new transaction is started but not committed, so do not
-				 * write to the permanent JSON yet
+				 * If this is first round, then create a new Level within JSON
+				 * Object
 				 */
 				if (firstRound) {
-					attributes.getRunningJSONObject().put(getLevelString(),
-							currentJSONObject);
 					firstRound = false;
-				} else {
 				}
+				attributes.getRunningJSONObject().put(getLevelString(),
+						currentJSONObject);
 			}
 			// SET command
 			else if (parsedStr[0].equalsIgnoreCase("SET")) {
-				System.out.println("setting");
-
+				/*
+				 * If this is first round, then create a new Level within JSON
+				 * Object
+				 */
 				if (firstRound) {
-					currentLevelNo++;
+					attributes.incrementCurrentLevelNo();
+					;
 					firstRound = false;
-				} else {
 				}
+
 				currentJSONObject = (JSONObject) attributes
 						.getRunningJSONObject().get(getLevelString());
 				if (null == currentJSONObject) {
 					currentJSONObject = new JSONObject();
 				}
+
+				// SET a 20
 				currentJSONObject.put(parsedStr[1], parsedStr[2]);
 				attributes.getRunningJSONObject().put(getLevelString(),
 						currentJSONObject);
@@ -99,7 +107,12 @@ public class IMDBEngine {
 				JSONObject resultObject = null;
 				String resultString = null;
 
-				for (int i = currentLevelNo; i > 0 && i >= variableUnsetLevel; i--) {
+				/*
+				 * If an UNSET command was issued recently, we don't search
+				 * beyond that level for a variable.
+				 */
+				for (int i = attributes.getCurrentLevelNo(); i > 0
+						&& i >= variableUnsetLevel; i--) {
 					resultObject = (JSONObject) attributes
 							.getRunningJSONObject().get("Level" + i);
 					if (null != resultObject
@@ -108,14 +121,19 @@ public class IMDBEngine {
 						break;
 					}
 				}
-				System.out.println("result of GET:" + resultString);
+				System.out.println(resultString);
 			}
 			// NUMEQUALTO command
 			else if (parsedStr[0].equalsIgnoreCase("NUMEQUALTO")) {
 				String valueToCompare = parsedStr[1];
 				JSONObject resultObject = null;
 				int numEqualTo = 0;
-				for (int i = currentLevelNo; i > 0; i--) {
+
+				/*
+				 * Start from current level and count the variable-instances of
+				 * specified value in increasingly higher levels.
+				 */
+				for (int i = attributes.getCurrentLevelNo(); i > 0; i--) {
 					resultObject = (JSONObject) attributes
 							.getRunningJSONObject().get("Level" + i);
 					if (null != resultObject
@@ -123,8 +141,7 @@ public class IMDBEngine {
 						numEqualTo++;
 					}
 				}
-				System.out.println("Result of NUMEQUALTO: " + valueToCompare
-						+ " is: " + numEqualTo);
+				System.out.println(numEqualTo);
 			}
 			// UNSET command
 			else if (parsedStr[0].equalsIgnoreCase("UNSET")) {
@@ -132,14 +149,19 @@ public class IMDBEngine {
 
 				JSONObject resultObject = null;
 				JSONObject backUpOfResultObject = null;
-				// resultObject.remove(variableToUnset);
 
-				for (int i = currentLevelNo; i > 0; i--) {
+				/*
+				 * Start from current level and search the variable to UNSET in
+				 * increasingly higher levels. During a GET command, we do not
+				 * move beyond the level where the most recent UNSET operation
+				 * was performed.
+				 */
+				for (int i = attributes.getCurrentLevelNo(); i > 0; i--) {
 					resultObject = (JSONObject) attributes
 							.getRunningJSONObject().get("Level" + i);
 					if (null != resultObject
 							&& resultObject.containsKey(variableToUnset)) {
-						// copy to another json cache
+						// copy to another JSONObject cache
 						attributes.getPermanentJSONObject().clear();
 						attributes.getPermanentJSONObject().putAll(
 								attributes.getRunningJSONObject());
@@ -148,12 +170,11 @@ public class IMDBEngine {
 						backUpOfResultObject = new JSONObject(resultObject);
 						resultObject.remove(variableToUnset);
 						variableUnsetLevel = i;
-						System.out.println("Removed variable "
-								+ variableToUnset + " from level:" + i);
 
+						// put back the removed object in permanent JSON
+						// temporarily
 						attributes.getPermanentJSONObject().put("Level" + i,
 								backUpOfResultObject);
-
 						break;
 					}
 				}
@@ -166,13 +187,13 @@ public class IMDBEngine {
 					continue;
 				}
 
-				// first restore running json from permanent json cache
+				// first restore running JSON from permanent JSON cache
 				attributes.getRunningJSONObject().putAll(
 						attributes.getPermanentJSONObject());
 
+				// Now delete current block
 				attributes.getRunningJSONObject().remove(getLevelString());
-
-				currentLevelNo--;
+				attributes.decrementCurrentLevelNo();
 			}
 			// COMMIT command: commit all operations starting at the top level
 			else if (parsedStr[0].equalsIgnoreCase("COMMIT")) {
@@ -182,8 +203,12 @@ public class IMDBEngine {
 					continue;
 				}
 
+				/*
+				 * During commit, re-write all the value pairs from Running
+				 * Cache to Permanent Cache.
+				 */
 				JSONObject resultJSONObject = new JSONObject();
-				for (int i = 1; i <= currentLevelNo; i++) {
+				for (int i = 1; i <= attributes.getCurrentLevelNo(); i++) {
 					System.out.println("elements:"
 							+ ((JSONObject) attributes.getRunningJSONObject()
 									.get("Level" + i)).entrySet());
@@ -191,12 +216,12 @@ public class IMDBEngine {
 							.getRunningJSONObject().get("Level" + i)));
 				}
 
-				// copy json to another cache
+				// copy JSON to permanent cache
 				attributes.getPermanentJSONObject().clear();
 				attributes.getPermanentJSONObject().put("Level1",
 						resultJSONObject);
 
-				// finally reset running json with freshly committed info
+				// finally reset Running cache with freshly committed info
 				attributes.getRunningJSONObject().clear();
 				attributes.getRunningJSONObject().putAll(
 						attributes.getPermanentJSONObject());
@@ -204,21 +229,24 @@ public class IMDBEngine {
 				// debug
 				System.out.println("running json:"
 						+ attributes.getRunningJSONObject().toString());
-			} else if (parsedStr[0].equalsIgnoreCase("D2")) {
-				// debug
-				System.out.println("permanent json:"
-						+ attributes.getPermanentJSONObject().toString());
 			}
 
 		}
 
 	}
 
+	/**
+	 * @return level string which forms the key for a new object in our Running
+	 *         Cache.
+	 */
 	public String getLevelString() {
-		System.out.println("Current level no is:" + currentLevelNo);
-		return "Level" + currentLevelNo;
+		return "Level" + attributes.getCurrentLevelNo();
 	}
 
+	/**
+	 * @param args
+	 * @Description For testing purpose
+	 */
 	public static void main(String[] args) {
 		IMDBEngine myEngine = new IMDBEngine();
 
