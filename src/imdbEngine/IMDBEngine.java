@@ -69,13 +69,13 @@ public class IMDBEngine {
 							currentJSONObject);
 					firstRound = false;
 				} else {
-					JSONObject innerJsonObject = (JSONObject) attributes
+					/*JSONObject innerJsonObject = (JSONObject) attributes
 							.getRunningJSONObject().get(
 									"Level" + (currentLevelNo - 1));
 					innerJsonObject.put(getLevelString(), currentJSONObject);
 					attributes.getRunningJSONObject().put(
 							"Level" + (currentLevelNo - 1), innerJsonObject);
-
+*/
 					/*
 					 * Copy all the variable on the upper/parent level to this
 					 */
@@ -87,7 +87,7 @@ public class IMDBEngine {
 				System.out.println("setting");
 				// parsedStr = lineCommand.toString().split(" ");
 
-				currentJSONObject = new JSONObject();
+				// currentJSONObject = new JSONObject();
 				if (firstRound) {
 					currentLevelNo++;
 					// currentJSONObject.put(parsedStr[1], parsedStr[2]);
@@ -99,11 +99,16 @@ public class IMDBEngine {
 					// attributes.getRunningJSONObject().put(getLevelString(),
 					// currentJSONObject);
 				}
-				//currentJSONObject.put(parsedStr[1], parsedStr[2]);
-				currentJSONObject = (JSONObject) attributes.getRunningJSONObject().get(getLevelString());
+				// currentJSONObject.put(parsedStr[1], parsedStr[2]);
+				currentJSONObject = (JSONObject) attributes
+						.getRunningJSONObject().get(getLevelString());
+				if (null == currentJSONObject) {
+					currentJSONObject = new JSONObject();
+				}
 				currentJSONObject.put(parsedStr[1], parsedStr[2]);
 				attributes.getRunningJSONObject().put(getLevelString(),
 						currentJSONObject);
+
 			}
 			// GET command
 			else if (parsedStr[0].equalsIgnoreCase("GET")) {
